@@ -5,10 +5,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import com.banking.studentbank.repository.UserRepository;
 
 @Configuration       // this class provides Spring beans
 @EnableWebSecurity   // enables Spring Security
@@ -16,6 +19,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final UserRepository userRepository;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -26,7 +30,6 @@ public class SecurityConfig {
                 // STATELESS = no sessions, every request must carry JWT token
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()   // login/register = public
-                        .requestMatchers("/api/hello").permitAll() // our test endpoint = public
                         .anyRequest().authenticated()              // everything else needs token
                 )
                 .addFilterBefore(jwtAuthenticationFilter,
@@ -35,6 +38,17 @@ public class SecurityConfig {
 
         return http.build();
 
+    }
+
+    @Bean
+    public UserDetailsService userDetailsService() {
+        return username -> userRepository.findByUsername(username)
+                .map(user -> org.springframework.security.core.userdetails.User
+                        .withUsername(user.getUsername())
+                        .password(user.getPassword())
+                        .roles(user.getRole().name())
+                        .build())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
     }
 
     @Bean
